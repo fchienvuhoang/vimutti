@@ -231,7 +231,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-10 font-sans">
       <header className="mb-10 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-          Phân Tích File Sao Kê Ngân Hàng
+          Vimutti - Phân loại sao kê
         </h1>
         <p className="text-gray-500 mt-2">
           Bóc tách thông tin thiện pháp dựa trên từ khóa khớp với nội dung giao dịch.
