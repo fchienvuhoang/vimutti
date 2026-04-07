@@ -1,6 +1,34 @@
 import * as xlsx from 'xlsx';
 import { ParsedRecord } from './types';
 
+function parseVietnameseDate(dateStr: string): number {
+  if (!dateStr) return Number.MAX_SAFE_INTEGER;
+  
+  const parts = dateStr.match(/\d+/g);
+  if (!parts || parts.length < 3) {
+    const fallback = new Date(dateStr).getTime();
+    return isNaN(fallback) ? Number.MAX_SAFE_INTEGER : fallback;
+  }
+  
+  let day = parseInt(parts[0], 10);
+  let month = parseInt(parts[1], 10) - 1;
+  let year = parseInt(parts[2], 10);
+  
+  if (parts[0].length === 4) {
+     year = parseInt(parts[0], 10);
+     month = parseInt(parts[1], 10) - 1;
+     day = parseInt(parts[2], 10);
+  } else if (year < 100) {
+     year += 2000;
+  }
+  
+  let hours = parts[3] ? parseInt(parts[3], 10) : 0;
+  let minutes = parts[4] ? parseInt(parts[4], 10) : 0;
+  let seconds = parts[5] ? parseInt(parts[5], 10) : 0;
+  
+  return new Date(year, month, day, hours, minutes, seconds).getTime();
+}
+
 export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -37,9 +65,9 @@ export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[
               searchText: chiTietGiaoDich,
             };
           })
-          .filter((r) => r.ngayGioGiaoDich || r.chiTietGiaoDich || r.tienRa || r.tienVao); // filter completely empty rows
+          .filter((r) => r.ngayGioGiaoDich || r.chiTietGiaoDich || r.tienRa || r.tienVao) // filter completely empty rows
+          .sort((a, b) => parseVietnameseDate(a.ngayGioGiaoDich) - parseVietnameseDate(b.ngayGioGiaoDich));
 
-        
         resolve(records);
       } catch (error) {
         reject(error);
