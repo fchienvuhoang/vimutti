@@ -18,4 +18,5 @@ export interface ParsedRecord {
 
   searchText: string;
   matchedCategoryId?: string;
+  isFooter?: boolean;
 }

@@ -51,9 +51,15 @@ export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[
         const records: ParsedRecord[] = dataRows
           .map((row) => {
             const chiTietGiaoDich = String(row[6] || "").trim();
+            const soThamChieu = String(row[0] || "").trim();
+            const ngayGioGiaoDich = String(row[1] || "").trim();
+            
+            const firstColsText = (soThamChieu + " " + ngayGioGiaoDich + " " + chiTietGiaoDich).toLowerCase();
+            const isFooter = firstColsText.includes("tổng") || firstColsText.includes("total") || (!ngayGioGiaoDich || !/\d/.test(ngayGioGiaoDich));
+
             return {
-              soThamChieu: String(row[0] || "").trim(),
-              ngayGioGiaoDich: String(row[1] || "").trim(),
+              soThamChieu,
+              ngayGioGiaoDich,
               loaiGiaoDich: String(row[2] || "").trim(),
               nganHang: String(row[3] || "").trim(),
               soTaiKhoan: String(row[4] || "").trim(),
@@ -63,22 +69,13 @@ export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[
               tienVao: row[8] !== "" && row[8] !== undefined ? row[8] : "",
               ghiChu: String(row[9] || "").trim(),
               searchText: chiTietGiaoDich,
+              isFooter
             };
           })
           .filter((r) => {
             if (!r.ngayGioGiaoDich && !r.chiTietGiaoDich && !r.tienRa && !r.tienVao) return false;
-            
-            // Dòng tổng kết ở cuối file thường chứa chữ "Tổng" hoặc "Total" ở các cột đầu
-            const firstColsText = (r.soThamChieu + " " + r.ngayGioGiaoDich + " " + r.chiTietGiaoDich).toLowerCase();
-            if (firstColsText.includes("tổng") || firstColsText.includes("total")) {
-              return false;
-            }
-
-            // Giao dịch thật bắt buộc phải có ngày giờ và ngày giờ phải chứa số
-            if (!r.ngayGioGiaoDich || !/\d/.test(r.ngayGioGiaoDich)) {
-              return false;
-            }
-
+            // Cho phép hiển thị footer mang thông tin tiền
+            if (r.isFooter && !r.tienRa && !r.tienVao && !r.chiTietGiaoDich) return false;
             return true;
           })
           .sort((a, b) => parseVietnameseDate(a.ngayGioGiaoDich) - parseVietnameseDate(b.ngayGioGiaoDich));

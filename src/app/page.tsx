@@ -131,7 +131,8 @@ export default function Home() {
          return String(val || "").replace(/\n/g, " "); 
        }).join("\t");
        const matchedName = record.matchedCategoryId ? (appliedCategories.find(c => c.id === record.matchedCategoryId)?.name || "Không khớp") : "Không khớp";
-       return `${index + 1}\t${rowStr}\t${matchedName}`;
+       const stt = record.isFooter ? "" : (index + 1);
+       return `${stt}\t${rowStr}\t${matchedName}`;
     }).join("\n");
     
     navigator.clipboard.writeText(headers + "\n" + rows);
@@ -430,7 +431,7 @@ export default function Home() {
                     activeTab === "all" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >
-                    Tất cả ({computedRecords.length})
+                    Tất cả ({computedRecords.filter(r => !r.isFooter).length})
                 </button>
                 {appliedCategories.map(cat => (
                     <button
@@ -440,7 +441,7 @@ export default function Home() {
                         activeTab === cat.id ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
                     }`}
                     >
-                    {cat.name} ({computedRecords.filter(r => r.matchedCategoryId === cat.id).length})
+                    {cat.name} ({computedRecords.filter(r => r.matchedCategoryId === cat.id && !r.isFooter).length})
                     </button>
                 ))}
                 <button
@@ -449,7 +450,7 @@ export default function Home() {
                     activeTab === "uncategorized" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >
-                    Chưa phân loại ({computedRecords.filter(r => !r.matchedCategoryId).length})
+                    Chưa phân loại ({computedRecords.filter(r => !r.matchedCategoryId && !r.isFooter).length})
                 </button>
                 </div>
 
@@ -513,18 +514,30 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredRecords.map((record, rowIndex) => (
-                      <tr key={rowIndex} className="transition-colors group hover:bg-gray-50">
+                    {filteredRecords.map((record, rowIndex) => {
+                      let rowBgClass = 'hover:bg-gray-50';
+                      let stickyBgClass = 'bg-white group-hover:bg-gray-50';
+
+                      if (record.isFooter) {
+                        rowBgClass = 'bg-amber-50 hover:bg-amber-100/50';
+                        stickyBgClass = 'bg-amber-50 group-hover:bg-amber-100/50';
+                      } else if (record.tienRa) {
+                        rowBgClass = 'bg-slate-100/60 hover:bg-slate-200/50';
+                        stickyBgClass = 'bg-slate-100/60 group-hover:bg-slate-200/50';
+                      }
+
+                      return (
+                      <tr key={rowIndex} className={`transition-colors group ${rowBgClass}`}>
                         <td
-                          className="px-4 py-3 text-gray-700 whitespace-nowrap text-center font-medium sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6]"
+                          className={`px-4 py-3 whitespace-nowrap text-center font-medium sticky left-0 z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass} ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`}
                           style={{ width: "50px", minWidth: "50px", maxWidth: "50px" }}
                         >
-                          {rowIndex + 1}
+                          {record.isFooter ? "" : (rowIndex + 1)}
                         </td>
                         {TABLE_COLUMNS.map((col, colIndex) => {
                           const val = record[col.key];
                           let displayVal = String(val || "");
-                          let baseClass = "px-4 py-3 text-gray-700";
+                          let baseClass = `px-4 py-3 ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`;
 
                           if (col.key === "chiTietGiaoDich") {
                             baseClass += " min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
@@ -551,7 +564,7 @@ export default function Home() {
                             <td
                               key={colIndex}
                               className={`${baseClass} ${
-                                col.left !== undefined ? 'sticky z-10 bg-white group-hover:bg-gray-50 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6]' : ''
+                                col.left !== undefined ? `sticky z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass}` : ''
                               }`}
                               style={styleObj}
                             >
@@ -569,7 +582,8 @@ export default function Home() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
