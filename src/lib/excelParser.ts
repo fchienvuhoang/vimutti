@@ -65,7 +65,22 @@ export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[
               searchText: chiTietGiaoDich,
             };
           })
-          .filter((r) => r.ngayGioGiaoDich || r.chiTietGiaoDich || r.tienRa || r.tienVao) // filter completely empty rows
+          .filter((r) => {
+            if (!r.ngayGioGiaoDich && !r.chiTietGiaoDich && !r.tienRa && !r.tienVao) return false;
+            
+            // Dòng tổng kết ở cuối file thường chứa chữ "Tổng" hoặc "Total" ở các cột đầu
+            const firstColsText = (r.soThamChieu + " " + r.ngayGioGiaoDich + " " + r.chiTietGiaoDich).toLowerCase();
+            if (firstColsText.includes("tổng") || firstColsText.includes("total")) {
+              return false;
+            }
+
+            // Giao dịch thật bắt buộc phải có ngày giờ và ngày giờ phải chứa số
+            if (!r.ngayGioGiaoDich || !/\d/.test(r.ngayGioGiaoDich)) {
+              return false;
+            }
+
+            return true;
+          })
           .sort((a, b) => parseVietnameseDate(a.ngayGioGiaoDich) - parseVietnameseDate(b.ngayGioGiaoDich));
 
         resolve(records);
