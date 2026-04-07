@@ -21,15 +21,15 @@ import {
 } from "lucide-react";
 
 const TABLE_COLUMNS = [
+  { label: "Chi tiết giao dịch", key: "chiTietGiaoDich" as keyof ParsedRecord, left: 50, width: 350 },
+  { label: "Tiền ra", key: "tienRa" as keyof ParsedRecord, width: 130 },
+  { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord, width: 130 },
   { label: "Số tham chiếu", key: "soThamChieu" as keyof ParsedRecord },
   { label: "Ngày giờ", key: "ngayGioGiaoDich" as keyof ParsedRecord },
   { label: "Loại giao dịch", key: "loaiGiaoDich" as keyof ParsedRecord },
   { label: "Ngân hàng", key: "nganHang" as keyof ParsedRecord },
   { label: "Số tài khoản", key: "soTaiKhoan" as keyof ParsedRecord },
   { label: "Tên chủ tài khoản", key: "tenChuTaiKhoan" as keyof ParsedRecord },
-  { label: "Chi tiết giao dịch", key: "chiTietGiaoDich" as keyof ParsedRecord },
-  { label: "Tiền ra", key: "tienRa" as keyof ParsedRecord },
-  { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord },
   { label: "Ghi chú", key: "ghiChu" as keyof ParsedRecord },
 ];
 
@@ -122,16 +122,16 @@ export default function Home() {
     if (filteredRecords.length === 0) return;
     
     // Headers
-    const headers = [...TABLE_COLUMNS.map(c => c.label), "Phân Loại"].join("\t");
+    const headers = ["STT", ...TABLE_COLUMNS.map(c => c.label), "Phân Loại"].join("\t");
     // Rows
-    const rows = filteredRecords.map(record => {
+    const rows = filteredRecords.map((record, index) => {
        const rowStr = TABLE_COLUMNS.map(col => {
          let val = record[col.key];
          // Replacing newlines so it doesn't break Excel TSV rows
          return String(val || "").replace(/\n/g, " "); 
        }).join("\t");
        const matchedName = record.matchedCategoryId ? (appliedCategories.find(c => c.id === record.matchedCategoryId)?.name || "Không khớp") : "Không khớp";
-       return rowStr + "\t" + matchedName;
+       return `${index + 1}\t${rowStr}\t${matchedName}`;
     }).join("\n");
     
     navigator.clipboard.writeText(headers + "\n" + rows);
@@ -483,10 +483,27 @@ export default function Home() {
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse text-sm">
-                  <thead className="bg-gray-50 sticky top-0 bg-white border-b border-gray-200 z-10">
+                  <thead className="bg-gray-50 sticky top-0 bg-white border-b border-gray-200 z-30">
                     <tr>
+                      <th
+                        className="px-4 py-3 font-medium text-gray-500 whitespace-nowrap text-center sticky left-0 z-30 bg-gray-50 border-r border-gray-200 shadow-[1px_0_0_0_#e5e7eb]"
+                        style={{ width: "50px", minWidth: "50px", maxWidth: "50px" }}
+                      >
+                        STT
+                      </th>
                       {TABLE_COLUMNS.map((col, i) => (
-                        <th key={i} className="px-4 py-3 font-medium text-gray-500 whitespace-nowrap">
+                        <th
+                          key={i}
+                          className={`px-4 py-3 font-medium text-gray-500 whitespace-nowrap bg-gray-50 ${
+                            col.left !== undefined ? 'sticky z-30 border-r border-gray-200 shadow-[1px_0_0_0_#e5e7eb]' : 'z-20 relative'
+                          }`}
+                          style={{
+                            left: col.left !== undefined ? `${col.left}px` : undefined,
+                            width: col.width ? `${col.width}px` : undefined,
+                            minWidth: col.width ? `${col.width}px` : undefined,
+                            maxWidth: col.width ? `${col.width}px` : undefined,
+                          }}
+                        >
                           {col.label}
                         </th>
                       ))}
@@ -497,14 +514,20 @@ export default function Home() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredRecords.map((record, rowIndex) => (
-                      <tr key={rowIndex} className="hover:bg-gray-50/50 transition-colors">
+                      <tr key={rowIndex} className="transition-colors group hover:bg-gray-50">
+                        <td
+                          className="px-4 py-3 text-gray-700 whitespace-nowrap text-center font-medium sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6]"
+                          style={{ width: "50px", minWidth: "50px", maxWidth: "50px" }}
+                        >
+                          {rowIndex + 1}
+                        </td>
                         {TABLE_COLUMNS.map((col, colIndex) => {
                           const val = record[col.key];
                           let displayVal = String(val || "");
-                          let className = "px-4 py-3 text-gray-700 min-w-[120px]";
+                          let baseClass = "px-4 py-3 text-gray-700";
 
                           if (col.key === "chiTietGiaoDich") {
-                            className = "px-4 py-3 text-gray-700 min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
+                            baseClass += " min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
                           } else if (col.key === "tienRa" || col.key === "tienVao") {
                             if (val !== "" && val !== null && val !== undefined) {
                               const numVal = Number(val);
@@ -512,13 +535,26 @@ export default function Home() {
                                 displayVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numVal);
                               }
                             }
-                            className = "px-4 py-3 text-gray-700 font-medium whitespace-nowrap text-right";
+                            baseClass += " font-medium whitespace-nowrap text-right";
                           } else {
-                            className = "px-4 py-3 text-gray-700 whitespace-nowrap";
+                            baseClass += " whitespace-nowrap";
                           }
-                          
+
+                          const styleObj: any = {
+                             left: col.left !== undefined ? `${col.left}px` : undefined,
+                             width: col.width ? `${col.width}px` : undefined,
+                             minWidth: col.width ? `${col.width}px` : undefined,
+                             maxWidth: col.width ? `${col.width}px` : undefined,
+                          };
+
                           return (
-                            <td key={colIndex} className={className}>
+                            <td
+                              key={colIndex}
+                              className={`${baseClass} ${
+                                col.left !== undefined ? 'sticky z-10 bg-white group-hover:bg-gray-50 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6]' : ''
+                              }`}
+                              style={styleObj}
+                            >
                               {displayVal}
                             </td>
                           );
