@@ -77,6 +77,7 @@ export default function Home() {
   const [isApplying, setIsApplying] = useState(false);
   const [applyMessage, setApplyMessage] = useState("");
   const [copiedTab, setCopiedTab] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const handleAddOrEditCategory = () => {
     // Split by comma, trim whitespace, and remove empty
@@ -178,6 +179,32 @@ export default function Home() {
     navigator.clipboard.writeText(headers + "\n" + rows);
     setCopiedTab(true);
     setTimeout(() => setCopiedTab(false), 2000);
+  };
+
+  const handleCopyAllData = () => {
+    if (computedRecords.length === 0) return;
+
+    // Headers with Nhóm Phân Loại
+    const headers = ["Nhóm Phân Loại", "STT", ...TABLE_COLUMNS.map(c => c.label)].join("\t");
+    
+    // Rows
+    const rows = computedRecords.filter(r => !r.isFooter).map((record, index) => {
+      let groupName = "Chưa phân loại";
+      if (record.matchedCategoryId) {
+        groupName = appliedCategories.find(c => c.id === record.matchedCategoryId)?.name || "Chưa phân loại";
+      }
+
+      const rowStr = TABLE_COLUMNS.map(col => {
+        let val = record[col.key];
+        return String(val || "").replace(/\n/g, " ");
+      }).join("\t");
+      
+      return `${groupName}\t${index + 1}\t${rowStr}`;
+    }).join("\n");
+
+    navigator.clipboard.writeText(headers + "\n" + rows);
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
   };
 
   // Compute matches
@@ -320,20 +347,24 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto flex flex-col gap-8">
 
-        {/* TOP SECTION: Cards side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* TOP SECTION */}
+        <div className="flex flex-col gap-6">
           {/* File Upload Panel */}
-          <section className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <UploadCloud className="w-5 h-5 text-indigo-600" />
-              Tải Lên Sao Kê
-            </h2>
-            <div className="flex-1 border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-center transition-colors hover:bg-gray-50 min-h-[250px]">
-              <FileSpreadsheet className="w-10 h-10 text-gray-400 mb-3" />
-              <p className="text-sm text-gray-600 mb-4">
-                Kéo thả file .xlsx vào đây hoặc nhấn để chọn
-              </p>
-              <label className="cursor-pointer bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+              <h2 className="text-lg font-semibold m-0">Tải Lên Sao Kê</h2>
+            </div>
+            
+            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+              {records.length > 0 && (
+                <div className="text-sm text-green-700 flex items-center gap-1.5 font-medium bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
+                  <Search className="w-4 h-4" />
+                  Đã tải {records.length} dòng
+                </div>
+              )}
+              <label className="cursor-pointer bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm">
+                <FileSpreadsheet className="w-4 h-4" />
                 Chọn file Excel
                 <input
                   type="file"
@@ -343,12 +374,6 @@ export default function Home() {
                 />
               </label>
             </div>
-            {records.length > 0 && (
-              <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-2">
-                <Search className="w-4 h-4 flex-shrink-0" />
-                <p>Đã đọc thành công {records.length} dòng dữ liệu. Bạn hãy thiết lập và áp dụng từ khóa để lọc dữ liệu.</p>
-              </div>
-            )}
           </section>
 
           {/* Keyword Management Panel */}
@@ -422,7 +447,7 @@ export default function Home() {
             </div>
 
             {/* List of draft categories */}
-            <div className="flex-1 overflow-y-auto space-y-3 max-h-[250px] mb-4 pr-1">
+            <div className="flex-1 overflow-y-auto space-y-3 max-h-[500px] mb-4 pr-1">
               {categories.map((cat) => (
                 <div key={cat.id} className="border border-gray-200 rounded-xl p-3 hover:shadow-sm transition bg-white">
                   <div className="flex justify-between items-start mb-2">
@@ -497,14 +522,15 @@ export default function Home() {
 
         {/* BOTTOM SECTION: Results & Display */}
         <div className="w-full">
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[500px] flex flex-col relative">
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[500px] flex flex-col sm:flex-row relative">
 
-            <div className="flex flex-col sm:flex-row border-b border-gray-200 bg-gray-50">
+            {/* Left Sidebar for Tabs */}
+            <div className="w-full sm:w-56 flex-shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r border-gray-200 bg-gray-50">
               {/* Tabs */}
-              <div className="flex-1 p-2 flex gap-2 overflow-x-auto">
+              <div className="flex-1 p-3 flex flex-col gap-1.5 overflow-y-auto max-h-[250px] sm:max-h-none">
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "all" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                  className={`w-full text-left flex-shrink-0 cursor-pointer px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "all" ? "bg-white text-indigo-600 shadow-sm border border-gray-200/60" : "text-gray-600 hover:bg-gray-200/50"
                     }`}
                 >
                   Tất cả ({computedRecords.filter(r => !r.isFooter).length})
@@ -513,7 +539,7 @@ export default function Home() {
                   <button
                     key={cat.id}
                     onClick={() => setActiveTab(cat.id)}
-                    className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === cat.id ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                    className={`w-full text-left flex-shrink-0 cursor-pointer px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === cat.id ? "bg-white text-indigo-600 shadow-sm border border-gray-200/60" : "text-gray-600 hover:bg-gray-200/50"
                       }`}
                   >
                     {cat.name} ({computedRecords.filter(r => r.matchedCategoryId === cat.id && !r.isFooter).length})
@@ -521,36 +547,57 @@ export default function Home() {
                 ))}
                 <button
                   onClick={() => setActiveTab("uncategorized")}
-                  className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "uncategorized" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                  className={`w-full text-left flex-shrink-0 cursor-pointer px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "uncategorized" ? "bg-white text-indigo-600 shadow-sm border border-gray-200/60" : "text-gray-600 hover:bg-gray-200/50"
                     }`}
                 >
                   Chưa phân loại ({computedRecords.filter(r => !r.matchedCategoryId && !r.isFooter).length})
                 </button>
               </div>
 
-              {/* Copy Button */}
-              <div className="p-2 border-t sm:border-t-0 sm:border-l border-gray-200 flex items-center justify-end">
-                <button
-                  onClick={handleCopyTable}
-                  className="flex-shrink-0 flex items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
-                >
-                  {copiedTab ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-400" />
-                      Đã Copy!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copy bảng {activeTab === "all" ? "chưa phân loại" : "dữ liệu Tab này"}
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
 
-            {/* Table */}
-            <div className="flex-1 overflow-auto p-0">
+            {/* Table Area */}
+            <div className="flex-1 flex flex-col min-w-0 bg-white">
+              {/* Header Copy Button */}
+              {filteredRecords.length > 0 && (
+                <div className="p-2 border-b border-gray-100 flex justify-end gap-2 bg-white z-10 sticky top-0">
+                  <button
+                    onClick={handleCopyAllData}
+                    className="flex justify-center items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+                  >
+                    {copiedAll ? (
+                      <>
+                        <Check className="w-4 h-4 text-indigo-500" />
+                        Đã Copy Tất Cả!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy tất cả tab
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCopyTable}
+                    className="flex justify-center items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition shadow-sm"
+                  >
+                    {copiedTab ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" />
+                        Đã Copy!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy bảng {activeTab === "all" ? "Tất cả" : activeTab === "uncategorized" ? "Chưa phân loại" : appliedCategories.find(c => c.id === activeTab)?.name || ""}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Table Wrapper */}
+              <div className="flex-1 overflow-auto p-0">
               {filteredRecords.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 min-h-[300px]">
                   <FileSpreadsheet className="w-12 h-12 mb-3 opacity-20" />
@@ -648,6 +695,45 @@ export default function Home() {
                     })}
                   </tbody>
                 </table>
+              )}
+            </div>
+
+              {/* Footer Copy Button */}
+              {filteredRecords.length > 0 && (
+                <div className="p-2 border-t border-gray-100 flex justify-end gap-2 bg-white">
+                  <button
+                    onClick={handleCopyAllData}
+                    className="flex justify-center items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+                  >
+                    {copiedAll ? (
+                      <>
+                        <Check className="w-4 h-4 text-indigo-500" />
+                        Đã Copy Tất Cả!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy tất cả tab
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCopyTable}
+                    className="flex justify-center items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition shadow-sm"
+                  >
+                    {copiedTab ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" />
+                        Đã Copy!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy bảng {activeTab === "all" ? "Tất cả" : activeTab === "uncategorized" ? "Chưa phân loại" : appliedCategories.find(c => c.id === activeTab)?.name || ""}
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 
