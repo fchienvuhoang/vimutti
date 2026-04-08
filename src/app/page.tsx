@@ -19,18 +19,13 @@ import {
   Save,
   Sparkles
 } from "lucide-react";
+import { checkAuthStatus, checkPasswordAction, getCategoriesAction, saveCategoriesAction, saveAppliedCategoriesAction, logoutAction } from "./actions";
 
 const TABLE_COLUMNS = [
+  { label: "Ngày giờ", key: "ngayGioGiaoDich" as keyof ParsedRecord, width: 140 },
+  { label: "Tên chủ tài khoản", key: "tenChuTaiKhoan" as keyof ParsedRecord, width: 220 },
   { label: "Chi tiết giao dịch", key: "chiTietGiaoDich" as keyof ParsedRecord, left: 50, width: 350 },
-  { label: "Tiền ra", key: "tienRa" as keyof ParsedRecord, width: 130 },
   { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord, width: 130 },
-  { label: "Số tham chiếu", key: "soThamChieu" as keyof ParsedRecord },
-  { label: "Ngày giờ", key: "ngayGioGiaoDich" as keyof ParsedRecord },
-  { label: "Loại giao dịch", key: "loaiGiaoDich" as keyof ParsedRecord },
-  { label: "Ngân hàng", key: "nganHang" as keyof ParsedRecord },
-  { label: "Số tài khoản", key: "soTaiKhoan" as keyof ParsedRecord },
-  { label: "Tên chủ tài khoản", key: "tenChuTaiKhoan" as keyof ParsedRecord },
-  { label: "Ghi chú", key: "ghiChu" as keyof ParsedRecord },
 ];
 
 export default function Home() {
@@ -38,39 +33,40 @@ export default function Home() {
   const [appliedCategories, setAppliedCategories] = useState<Category[]>([]);
   const [records, setRecords] = useState<ParsedRecord[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
-    const savedCategories = localStorage.getItem("vimutti_categories");
-    const savedAppliedCategories = localStorage.getItem("vimutti_appliedCategories");
-    
-    if (savedCategories) {
-      try {
-        setCategories(JSON.parse(savedCategories));
-      } catch (e) {
-        console.error("Gặp lỗi tải categories:", e);
+    async function init() {
+      const auth = await checkAuthStatus();
+      setIsAuthenticated(auth);
+      
+      if (auth) {
+        const data = await getCategoriesAction();
+        setCategories(data.categories);
+        setAppliedCategories(data.appliedCategories);
+        setIsLoaded(true);
       }
     }
-    if (savedAppliedCategories) {
-      try {
-        setAppliedCategories(JSON.parse(savedAppliedCategories));
-      } catch (e) {
-        console.error("Gặp lỗi tải appliedCategories:", e);
-      }
-    }
-    setIsLoaded(true);
+    init();
   }, []);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("vimutti_categories", JSON.stringify(categories));
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    const success = await checkPasswordAction(password);
+    if (success) {
+      setIsAuthenticated(true);
+      const data = await getCategoriesAction();
+      setCategories(data.categories);
+      setAppliedCategories(data.appliedCategories);
+      setIsLoaded(true);
+    } else {
+      setLoginError("Mật khẩu không đúng");
     }
-  }, [categories, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("vimutti_appliedCategories", JSON.stringify(appliedCategories));
-    }
-  }, [appliedCategories, isLoaded]);
+  };
 
   // Form states for category
   const [newCatKeywords, setNewCatKeywords] = useState("");
@@ -94,8 +90,10 @@ export default function Home() {
     // Use the first keyword as the category name, capitalized
     const generatedName = keywords[0].toUpperCase();
 
+    let updated: Category[];
     if (editingId) {
-      setCategories(categories.map(c => c.id === editingId ? { ...c, name: generatedName, keywords } : c));
+      updated = categories.map(c => c.id === editingId ? { ...c, name: generatedName, keywords } : c);
+      setCategories(updated);
       setEditingId(null);
     } else {
       const newCategory: Category = {
@@ -103,9 +101,13 @@ export default function Home() {
         name: generatedName,
         keywords,
       };
-      setCategories([...categories, newCategory]);
+      updated = [...categories, newCategory];
+      setCategories(updated);
     }
-    
+
+    // Save to database
+    saveCategoriesAction(updated);
+
     // Reset form
     setNewCatKeywords("");
   };
@@ -116,7 +118,10 @@ export default function Home() {
   };
 
   const handleRemoveCategory = (id: string) => {
-    setCategories(categories.filter((c) => c.id !== id));
+    const updated = categories.filter((c) => c.id !== id);
+    setCategories(updated);
+    saveCategoriesAction(updated);
+
     if (editingId === id) {
       setEditingId(null);
       setNewCatKeywords("");
@@ -126,9 +131,11 @@ export default function Home() {
   const handleApplyCategories = () => {
     setIsApplying(true);
     setApplyMessage("");
-    setTimeout(() => {
+    setTimeout(async () => {
       // Save to the applied state which drives the matching logic
       setAppliedCategories([...categories]);
+      await saveAppliedCategoriesAction(categories);
+
       // If active tab doesn't exist anymore, reset to "all"
       if (!categories.find(c => c.id === activeTab) && activeTab !== "all" && activeTab !== "uncategorized") {
         setActiveTab("all");
@@ -154,21 +161,20 @@ export default function Home() {
 
   const handleCopyTable = () => {
     if (filteredRecords.length === 0) return;
-    
+
     // Headers
-    const headers = ["STT", ...TABLE_COLUMNS.map(c => c.label), "Phân Loại"].join("\t");
+    const headers = ["STT", ...TABLE_COLUMNS.map(c => c.label)].join("\t");
     // Rows
     const rows = filteredRecords.map((record, index) => {
-       const rowStr = TABLE_COLUMNS.map(col => {
-         let val = record[col.key];
-         // Replacing newlines so it doesn't break Excel TSV rows
-         return String(val || "").replace(/\n/g, " "); 
-       }).join("\t");
-       const matchedName = record.matchedCategoryId ? (appliedCategories.find(c => c.id === record.matchedCategoryId)?.name || "Không khớp") : "Không khớp";
-       const stt = record.isFooter ? "" : (index + 1);
-       return `${stt}\t${rowStr}\t${matchedName}`;
+      const rowStr = TABLE_COLUMNS.map(col => {
+        let val = record[col.key];
+        // Replacing newlines so it doesn't break Excel TSV rows
+        return String(val || "").replace(/\n/g, " ");
+      }).join("\t");
+      const stt = record.isFooter ? "" : (index + 1);
+      return `${stt}\t${rowStr}`;
     }).join("\n");
-    
+
     navigator.clipboard.writeText(headers + "\n" + rows);
     setCopiedTab(true);
     setTimeout(() => setCopiedTab(false), 2000);
@@ -203,25 +209,25 @@ export default function Home() {
     if (activeTab === "all") return computedRecords;
     if (activeTab === "uncategorized")
       return computedRecords.filter((r) => !r.matchedCategoryId);
-    
+
     return computedRecords.filter((r) => r.matchedCategoryId === activeTab);
   }, [computedRecords, activeTab]);
 
   // Auto-generate suggestions from chiTietGiaoDich
   const suggestedKeywords = useMemo(() => {
     if (records.length === 0) return [];
-    
+
     const STOP_WORDS = new Set([
-      "chuyển", "chuyen", "tiền", "tien", "ck", "cho", "thanh", "toán", "toan", "từ", "tu", 
-      "tk", "tài", "khoản", "tai", "khoan", "ngân", "hàng", "ngan", "hang", "nh", "đến", "den", 
-      "vào", "vao", "ra", "phí", "phi", "gd", "giao", "dịch", "dich", "số", "so", "thẻ", "the", 
-      "qua", "mb", "vcb", "bidv", "tcb", "vietcombank", "techcombank", "mbbank", "ngày", "ngay", 
-      "tháng", "thang", "năm", "nam", "ibft", "nạp", "nap", "rút", "rut", "phát", "sinh", "phat", 
+      "chuyển", "chuyen", "tiền", "tien", "ck", "cho", "thanh", "toán", "toan", "từ", "tu",
+      "tk", "tài", "khoản", "tai", "khoan", "ngân", "hàng", "ngan", "hang", "nh", "đến", "den",
+      "vào", "vao", "ra", "phí", "phi", "gd", "giao", "dịch", "dich", "số", "so", "thẻ", "the",
+      "qua", "mb", "vcb", "bidv", "tcb", "vietcombank", "techcombank", "mbbank", "ngày", "ngay",
+      "tháng", "thang", "năm", "nam", "ibft", "nạp", "nap", "rút", "rut", "phát", "sinh", "phat",
       "chi", "thu", "của", "cua", "nhận", "nhan", "gửi", "gui", "qrvn", "vnpay", "mã", "ma", "vietinbank", "agribank"
     ]);
 
     const counts: Record<string, number> = {};
-    
+
     records.forEach(r => {
       const text = r.chiTietGiaoDich.toLowerCase().trim();
       if (!text) return;
@@ -231,19 +237,19 @@ export default function Home() {
         .replace(/[.,/#!$%^&*;:{}=\-_`~()+\\|\n]/g, " ")
         .split(/\s+/)
         .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
-      
+
       // 1-grams (ignore standalone numbers)
-      words.forEach(w => { 
+      words.forEach(w => {
         if (!/^\d+$/.test(w)) {
-           counts[w] = (counts[w] || 0) + 1; 
+          counts[w] = (counts[w] || 0) + 1;
         }
       });
 
       // 2-grams (ignore pure numbers combined like '123 456')
       for (let i = 0; i < words.length - 1; i++) {
-        const bigram = words[i] + " " + words[i+1];
+        const bigram = words[i] + " " + words[i + 1];
         if (!/^\d+\s\d+$/.test(bigram)) {
-           counts[bigram] = (counts[bigram] || 0) + 1;
+          counts[bigram] = (counts[bigram] || 0) + 1;
         }
       }
     });
@@ -251,30 +257,69 @@ export default function Home() {
     return Object.entries(counts)
       .filter(([word, count]) => count > 1) // appear more than once
       .sort((a, b) => {
-         const aHasTp = a[0].startsWith('tp');
-         const bHasTp = b[0].startsWith('tp');
-         if (aHasTp && !bHasTp) return -1;
-         if (!aHasTp && bHasTp) return 1;
-         // Secondary sort by frequency
-         return b[1] - a[1];
+        const aHasTp = a[0].startsWith('tp');
+        const bHasTp = b[0].startsWith('tp');
+        if (aHasTp && !bHasTp) return -1;
+        if (!aHasTp && bHasTp) return 1;
+        // Secondary sort by frequency
+        return b[1] - a[1];
       })
       .slice(0, 15) // top 15 suggestions
       .map(entry => entry[0]);
   }, [records]);
 
+  if (isAuthenticated === null) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col p-4 font-sans">
+        <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+           <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Đăng Nhập Vimutti</h1>
+           <form onSubmit={handleLogin} className="flex flex-col gap-4">
+              <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                 <input 
+                   type="password" 
+                   value={password} 
+                   onChange={e => setPassword(e.target.value)} 
+                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                   placeholder="Nhập mật khẩu..." 
+                   autoFocus
+                 />
+              </div>
+              {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
+              <button type="submit" className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition">
+                Vào Trang
+              </button>
+           </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-10 font-sans">
-      <header className="mb-10 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-          Vimutti - Phân loại sao kê
-        </h1>
-        <p className="text-gray-500 mt-2">
-          Bóc tách thông tin thiện pháp dựa trên từ khóa khớp với nội dung giao dịch.
-        </p>
+      <header className="mb-10 max-w-6xl mx-auto flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Vimutti - Phân loại sao kê
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Bóc tách thông tin thiện pháp dựa trên từ khóa khớp với nội dung giao dịch.
+          </p>
+        </div>
+        <button 
+          onClick={async () => { await logoutAction(); setIsAuthenticated(false); }}
+          className="text-sm cursor-pointer font-medium text-gray-600 bg-white px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+        >
+          Đăng xuất
+        </button>
       </header>
 
       <main className="max-w-6xl mx-auto flex flex-col gap-8">
-        
+
         {/* TOP SECTION: Cards side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* File Upload Panel */}
@@ -312,7 +357,7 @@ export default function Home() {
               <Filter className="w-5 h-5 text-indigo-600" />
               Cài Đặt Thiện Pháp
             </h2>
-            
+
             {/* Add form */}
             <div className={`bg-gray-50 rounded-xl p-4 border mb-4 transition-colors ${editingId ? 'border-yellow-300 bg-yellow-50' : 'border-gray-100'}`}>
               <div className="space-y-3">
@@ -327,29 +372,29 @@ export default function Home() {
                     placeholder="tp44, hoa sen, ..."
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                     onKeyDown={(e) => {
-                       if (e.key === 'Enter') handleAddOrEditCategory();
+                      if (e.key === 'Enter') handleAddOrEditCategory();
                     }}
                   />
                   {suggestedKeywords.length > 0 && (
                     <div className="mt-3 bg-white p-2 rounded border border-gray-100">
-                       <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 mb-2">
-                         <Sparkles className="w-3 h-3" />
-                         Gợi ý từ khóa thông minh (Nhấn để thêm):
-                       </span>
-                       <div className="flex flex-wrap gap-1.5">
-                         {suggestedKeywords.map((kw, i) => (
-                           <button
-                             key={i}
-                             onClick={() => {
-                               const current = newCatKeywords.trim();
-                               setNewCatKeywords(current ? current + ", " + kw : kw);
-                             }}
-                             className="text-[11px] bg-amber-50 text-amber-700 px-2 py-1 rounded hover:bg-amber-100 transition cursor-pointer"
-                           >
-                             {kw}
-                           </button>
-                         ))}
-                       </div>
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 mb-2">
+                        <Sparkles className="w-3 h-3" />
+                        Gợi ý từ khóa thông minh (Nhấn để thêm):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {suggestedKeywords.map((kw, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              const current = newCatKeywords.trim();
+                              setNewCatKeywords(current ? current + ", " + kw : kw);
+                            }}
+                            className="text-[11px] bg-amber-50 text-amber-700 px-2 py-1 rounded hover:bg-amber-100 transition cursor-pointer"
+                          >
+                            {kw}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -420,9 +465,8 @@ export default function Home() {
             <button
               onClick={handleApplyCategories}
               disabled={isApplying}
-              className={`w-full relative mt-auto flex items-center justify-center cursor-pointer gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg text-base font-semibold transition shadow-sm ${
-                isApplying ? 'bg-indigo-500 cursor-wait' : 'hover:bg-indigo-700'
-              }`}
+              className={`w-full relative mt-auto flex items-center justify-center cursor-pointer gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg text-base font-semibold transition shadow-sm ${isApplying ? 'bg-indigo-500 cursor-wait' : 'hover:bg-indigo-700'
+                }`}
             >
               {isApplying ? (
                 <>
@@ -436,12 +480,11 @@ export default function Home() {
                 </>
               )}
             </button>
-            
+
             {/* Success Banner */}
             <div
-              className={`mt-4 overflow-hidden transition-all duration-300 ease-in-out ${
-                applyMessage ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
-              }`}
+              className={`mt-4 overflow-hidden transition-all duration-300 ease-in-out ${applyMessage ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                }`}
             >
               <div className="bg-emerald-50 text-emerald-700 text-sm font-medium border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
@@ -455,58 +498,55 @@ export default function Home() {
         {/* BOTTOM SECTION: Results & Display */}
         <div className="w-full">
           <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[500px] flex flex-col relative">
-            
+
             <div className="flex flex-col sm:flex-row border-b border-gray-200 bg-gray-50">
-                {/* Tabs */}
-                <div className="flex-1 p-2 flex gap-2 overflow-x-auto">
+              {/* Tabs */}
+              <div className="flex-1 p-2 flex gap-2 overflow-x-auto">
                 <button
-                    onClick={() => setActiveTab("all")}
-                    className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === "all" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                  onClick={() => setActiveTab("all")}
+                  className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "all" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >
-                    Tất cả ({computedRecords.filter(r => !r.isFooter).length})
+                  Tất cả ({computedRecords.filter(r => !r.isFooter).length})
                 </button>
                 {appliedCategories.map(cat => (
-                    <button
+                  <button
                     key={cat.id}
                     onClick={() => setActiveTab(cat.id)}
-                    className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        activeTab === cat.id ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                    >
+                    className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === cat.id ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                  >
                     {cat.name} ({computedRecords.filter(r => r.matchedCategoryId === cat.id && !r.isFooter).length})
-                    </button>
+                  </button>
                 ))}
                 <button
-                    onClick={() => setActiveTab("uncategorized")}
-                    className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === "uncategorized" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                  onClick={() => setActiveTab("uncategorized")}
+                  className={`flex-shrink-0 cursor-pointer px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "uncategorized" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >
-                    Chưa phân loại ({computedRecords.filter(r => !r.matchedCategoryId && !r.isFooter).length})
+                  Chưa phân loại ({computedRecords.filter(r => !r.matchedCategoryId && !r.isFooter).length})
                 </button>
-                </div>
+              </div>
 
-                {/* Copy Button */}
-                <div className="p-2 border-t sm:border-t-0 sm:border-l border-gray-200 flex items-center justify-end">
-                  <button
-                    onClick={handleCopyTable}
-                    className="flex-shrink-0 flex items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
-                  >
-                    {copiedTab ? (
-                      <>
-                        <Check className="w-4 h-4 text-green-400" />
-                        Đã Copy!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Copy bảng {activeTab === "all" ? "chưa phân loại" : "dữ liệu Tab này"}
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* Copy Button */}
+              <div className="p-2 border-t sm:border-t-0 sm:border-l border-gray-200 flex items-center justify-end">
+                <button
+                  onClick={handleCopyTable}
+                  className="flex-shrink-0 flex items-center cursor-pointer gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+                >
+                  {copiedTab ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-400" />
+                      Đã Copy!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy bảng {activeTab === "all" ? "chưa phân loại" : "dữ liệu Tab này"}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Table */}
@@ -529,9 +569,8 @@ export default function Home() {
                       {TABLE_COLUMNS.map((col, i) => (
                         <th
                           key={i}
-                          className={`px-4 py-3 font-medium text-gray-500 whitespace-nowrap bg-gray-50 ${
-                            col.left !== undefined ? 'sticky z-30 border-r border-gray-200 shadow-[1px_0_0_0_#e5e7eb]' : 'z-20 relative'
-                          }`}
+                          className={`px-4 py-3 font-medium text-gray-500 whitespace-nowrap bg-gray-50 ${col.left !== undefined ? 'sticky z-30 border-r border-gray-200 shadow-[1px_0_0_0_#e5e7eb]' : 'z-20 relative'
+                            }`}
                           style={{
                             left: col.left !== undefined ? `${col.left}px` : undefined,
                             width: col.width ? `${col.width}px` : undefined,
@@ -542,9 +581,6 @@ export default function Home() {
                           {col.label}
                         </th>
                       ))}
-                      <th className="px-4 py-3 font-medium text-gray-500 whitespace-nowrap border-l border-gray-100 bg-gray-50">
-                        Phân Loại
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -561,68 +597,60 @@ export default function Home() {
                       }
 
                       return (
-                      <tr key={rowIndex} className={`transition-colors group ${rowBgClass}`}>
-                        <td
-                          className={`px-4 py-3 whitespace-nowrap text-center font-medium sticky left-0 z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass} ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`}
-                          style={{ width: "50px", minWidth: "50px", maxWidth: "50px" }}
-                        >
-                          {record.isFooter ? "" : (rowIndex + 1)}
-                        </td>
-                        {TABLE_COLUMNS.map((col, colIndex) => {
-                          const val = record[col.key];
-                          let displayVal = String(val || "");
-                          let baseClass = `px-4 py-3 ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`;
+                        <tr key={rowIndex} className={`transition-colors group ${rowBgClass}`}>
+                          <td
+                            className={`px-4 py-3 whitespace-nowrap text-center font-medium sticky left-0 z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass} ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`}
+                            style={{ width: "50px", minWidth: "50px", maxWidth: "50px" }}
+                          >
+                            {record.isFooter ? "" : (rowIndex + 1)}
+                          </td>
+                          {TABLE_COLUMNS.map((col, colIndex) => {
+                            const val = record[col.key];
+                            let displayVal = String(val || "");
+                            let baseClass = `px-4 py-3 ${record.tienRa && !record.isFooter ? 'text-slate-500' : 'text-gray-700'}`;
 
-                          if (col.key === "chiTietGiaoDich") {
-                            baseClass += " min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
-                          } else if (col.key === "tienRa" || col.key === "tienVao") {
-                            if (val !== "" && val !== null && val !== undefined) {
-                              const numVal = Number(val);
-                              if (!isNaN(numVal)) {
-                                displayVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numVal);
+                            if (col.key === "chiTietGiaoDich") {
+                              baseClass += " min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
+                            } else if (col.key === "tienRa" || col.key === "tienVao") {
+                              if (val !== "" && val !== null && val !== undefined) {
+                                const numVal = Number(val);
+                                if (!isNaN(numVal)) {
+                                  displayVal = new Intl.NumberFormat('en-US').format(numVal) + ' ₫';
+                                }
                               }
+                              baseClass += " font-medium whitespace-nowrap text-left";
+                            } else if (col.key === "tenChuTaiKhoan" || col.key === "ngayGioGiaoDich") {
+                              baseClass += " whitespace-nowrap overflow-hidden text-ellipsis text-sm";
+                            } else {
+                              baseClass += " whitespace-nowrap";
                             }
-                            baseClass += " font-medium whitespace-nowrap text-right";
-                          } else {
-                            baseClass += " whitespace-nowrap";
-                          }
 
-                          const styleObj: any = {
-                             left: col.left !== undefined ? `${col.left}px` : undefined,
-                             width: col.width ? `${col.width}px` : undefined,
-                             minWidth: col.width ? `${col.width}px` : undefined,
-                             maxWidth: col.width ? `${col.width}px` : undefined,
-                          };
+                            const styleObj: any = {
+                              left: col.left !== undefined ? `${col.left}px` : undefined,
+                              width: col.width ? `${col.width}px` : undefined,
+                              minWidth: col.width ? `${col.width}px` : undefined,
+                              maxWidth: col.width ? `${col.width}px` : undefined,
+                            };
 
-                          return (
-                            <td
-                              key={colIndex}
-                              className={`${baseClass} ${
-                                col.left !== undefined ? `sticky z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass}` : ''
-                              }`}
-                              style={styleObj}
-                            >
-                              {displayVal}
-                            </td>
-                          );
-                        })}
-                        <td className="px-4 py-3 border-l border-gray-100 bg-gray-50/50 whitespace-nowrap">
-                          {record.matchedCategoryId ? (
-                            <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-md font-medium text-xs">
-                              {appliedCategories.find(c => c.id === record.matchedCategoryId)?.name}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs italic">Không khớp</span>
-                          )}
-                        </td>
-                      </tr>
+                            return (
+                              <td
+                                key={colIndex}
+                                className={`${baseClass} ${col.left !== undefined ? `sticky z-10 border-r border-gray-100 shadow-[1px_0_0_0_#f3f4f6] ${stickyBgClass}` : ''
+                                  }`}
+                                style={styleObj}
+                              >
+                                {displayVal}
+                              </td>
+                            );
+                          })}
+                        </tr>
                       );
                     })}
                   </tbody>
                 </table>
               )}
             </div>
-            
+
           </section>
         </div>
       </main>
