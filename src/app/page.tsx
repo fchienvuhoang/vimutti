@@ -666,8 +666,10 @@ export default function Home() {
                                 }
                               }
                               baseClass += " font-medium whitespace-nowrap text-left";
-                            } else if (col.key === "tenChuTaiKhoan" || col.key === "ngayGioGiaoDich") {
+                            } else if (col.key === "ngayGioGiaoDich") {
                               baseClass += " whitespace-nowrap overflow-hidden text-ellipsis text-sm";
+                            } else if (col.key === "tenChuTaiKhoan") {
+                              baseClass += " whitespace-normal break-words text-sm";
                             } else {
                               baseClass += " whitespace-nowrap";
                             }
