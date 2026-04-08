@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { parseExcelBankStatement } from "@/lib/excelParser";
 import { Category, ParsedRecord } from "@/lib/types";
 import {
@@ -37,6 +37,40 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [appliedCategories, setAppliedCategories] = useState<Category[]>([]);
   const [records, setRecords] = useState<ParsedRecord[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedCategories = localStorage.getItem("vimutti_categories");
+    const savedAppliedCategories = localStorage.getItem("vimutti_appliedCategories");
+    
+    if (savedCategories) {
+      try {
+        setCategories(JSON.parse(savedCategories));
+      } catch (e) {
+        console.error("Gặp lỗi tải categories:", e);
+      }
+    }
+    if (savedAppliedCategories) {
+      try {
+        setAppliedCategories(JSON.parse(savedAppliedCategories));
+      } catch (e) {
+        console.error("Gặp lỗi tải appliedCategories:", e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("vimutti_categories", JSON.stringify(categories));
+    }
+  }, [categories, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("vimutti_appliedCategories", JSON.stringify(appliedCategories));
+    }
+  }, [appliedCategories, isLoaded]);
 
   // Form states for category
   const [newCatKeywords, setNewCatKeywords] = useState("");
