@@ -615,7 +615,7 @@ export default function Home() {
                               if (val !== "" && val !== null && val !== undefined) {
                                 const numVal = Number(val);
                                 if (!isNaN(numVal)) {
-                                  displayVal = new Intl.NumberFormat('en-US').format(numVal) + ' ₫';
+                                  displayVal = new Intl.NumberFormat('en-US').format(numVal);
                                 }
                               }
                               baseClass += " font-medium whitespace-nowrap text-left";
