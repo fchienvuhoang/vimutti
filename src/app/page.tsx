@@ -65,8 +65,8 @@ const TABLE_COLUMNS = [
   { label: "Ngày giờ", key: "ngayGioGiaoDich" as keyof ParsedRecord, width: 140 },
   { label: "Tên chủ tài khoản", key: "tenChuTaiKhoan" as keyof ParsedRecord, width: 220 },
   { label: "Chi tiết giao dịch", key: "chiTietGiaoDich" as keyof ParsedRecord, left: 50, width: 350 },
-  { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord, width: 130 },
   { label: "Tiền ra", key: "tienRa" as keyof ParsedRecord, width: 130 },
+  { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord, width: 130 },
 ];
 
 export default function Home() {
