@@ -213,7 +213,7 @@ export default function Home() {
         if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
         else if (col.key === "tienRa" || col.key === "tienVao") {
           const num = cleanNumber(val);
-          if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
+          if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN').format(num);
         }
         // Replacing newlines so it doesn't break Excel TSV rows
         return String(val || "").replace(/\n/g, " ");
@@ -245,7 +245,7 @@ export default function Home() {
         if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
         else if (col.key === "tienRa" || col.key === "tienVao") {
            const num = cleanNumber(val);
-           if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
+           if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN').format(num);
         }
         return String(val || "").replace(/\n/g, " ");
       }).join("\t");
@@ -713,7 +713,7 @@ export default function Home() {
                               if (val !== "" && val !== null && val !== undefined) {
                                 const numVal = cleanNumber(val);
                                 if (!isNaN(numVal)) {
-                                  displayVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numVal);
+                                  displayVal = new Intl.NumberFormat('vi-VN').format(numVal);
                                 }
                               }
                               baseClass += " font-medium whitespace-nowrap text-left text-slate-700";
