@@ -222,7 +222,7 @@ export default function Home() {
       return `${stt}\t${rowStr}`;
     }).join("\n");
 
-    navigator.clipboard.writeText(headers + "\n" + rows);
+    navigator.clipboard.writeText(rows);
     setCopiedTab(true);
     setTimeout(() => setCopiedTab(false), 2000);
   };
@@ -253,7 +253,7 @@ export default function Home() {
       return `${groupName}\t${index + 1}\t${rowStr}`;
     }).join("\n");
 
-    navigator.clipboard.writeText(headers + "\n" + rows);
+    navigator.clipboard.writeText(rows);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
   };
