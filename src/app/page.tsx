@@ -21,11 +21,52 @@ import {
 } from "lucide-react";
 import { checkAuthStatus, checkPasswordAction, getCategoriesAction, saveCategoriesAction, saveAppliedCategoriesAction, logoutAction } from "./actions";
 
+const cleanNumber = (val: any) => {
+  if (val === "" || val === null || val === undefined) return NaN;
+  if (typeof val === 'number') return val;
+  const str = String(val).trim();
+  const usFormat = str.replace(/,/g, '');
+  if (!isNaN(Number(usFormat)) && usFormat !== '') return Number(usFormat);
+  const vnFormat = str.replace(/\./g, '').replace(/,/g, '.');
+  if (!isNaN(Number(vnFormat)) && vnFormat !== '') return Number(vnFormat);
+  return NaN;
+};
+
+const formatDateStr = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.match(/\d+/g);
+  if (!parts || parts.length < 3) return dateStr;
+  
+  let day = parseInt(parts[0], 10);
+  let month = parseInt(parts[1], 10);
+  let year = parseInt(parts[2], 10);
+  
+  if (parts[0].length === 4) {
+     year = parseInt(parts[0], 10);
+     month = parseInt(parts[1], 10);
+     day = parseInt(parts[2], 10);
+  } else if (year < 100) {
+     year += 2000;
+  }
+  
+  let hours = parts[3] ? parseInt(parts[3], 10) : 0;
+  let minutes = parts[4] ? parseInt(parts[4], 10) : 0;
+  
+  const mm = month.toString().padStart(2, '0');
+  const dd = day.toString().padStart(2, '0');
+  const yyyy = year.toString();
+  const hh = hours.toString().padStart(2, '0');
+  const min = minutes.toString().padStart(2, '0');
+  
+  return `${mm}/${dd}/${yyyy} ${hh}:${min}`;
+};
+
 const TABLE_COLUMNS = [
   { label: "Ngày giờ", key: "ngayGioGiaoDich" as keyof ParsedRecord, width: 140 },
   { label: "Tên chủ tài khoản", key: "tenChuTaiKhoan" as keyof ParsedRecord, width: 220 },
   { label: "Chi tiết giao dịch", key: "chiTietGiaoDich" as keyof ParsedRecord, left: 50, width: 350 },
   { label: "Tiền vào", key: "tienVao" as keyof ParsedRecord, width: 130 },
+  { label: "Tiền ra", key: "tienRa" as keyof ParsedRecord, width: 130 },
 ];
 
 export default function Home() {
@@ -169,6 +210,11 @@ export default function Home() {
     const rows = filteredRecords.map((record, index) => {
       const rowStr = TABLE_COLUMNS.map(col => {
         let val = record[col.key];
+        if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
+        else if (col.key === "tienRa" || col.key === "tienVao") {
+          const num = cleanNumber(val);
+          if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
+        }
         // Replacing newlines so it doesn't break Excel TSV rows
         return String(val || "").replace(/\n/g, " ");
       }).join("\t");
@@ -196,6 +242,11 @@ export default function Home() {
 
       const rowStr = TABLE_COLUMNS.map(col => {
         let val = record[col.key];
+        if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
+        else if (col.key === "tienRa" || col.key === "tienVao") {
+           const num = cleanNumber(val);
+           if (!isNaN(num)) val = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
+        }
         return String(val || "").replace(/\n/g, " ");
       }).join("\t");
       
@@ -660,14 +711,15 @@ export default function Home() {
                               baseClass += " min-w-[250px] whitespace-pre-wrap break-words leading-relaxed";
                             } else if (col.key === "tienRa" || col.key === "tienVao") {
                               if (val !== "" && val !== null && val !== undefined) {
-                                const numVal = Number(val);
+                                const numVal = cleanNumber(val);
                                 if (!isNaN(numVal)) {
-                                  displayVal = new Intl.NumberFormat('en-US').format(numVal);
+                                  displayVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numVal);
                                 }
                               }
-                              baseClass += " font-medium whitespace-nowrap text-left";
+                              baseClass += " font-medium whitespace-nowrap text-left text-slate-700";
                             } else if (col.key === "ngayGioGiaoDich") {
-                              baseClass += " whitespace-nowrap overflow-hidden text-ellipsis text-sm";
+                              displayVal = formatDateStr(displayVal);
+                              baseClass += " whitespace-nowrap overflow-hidden text-ellipsis text-sm text-slate-600";
                             } else if (col.key === "tenChuTaiKhoan") {
                               baseClass += " whitespace-normal break-words text-sm";
                             } else {

@@ -43,7 +43,7 @@ export async function parseExcelBankStatement(file: File): Promise<ParsedRecord[
         const worksheet = workbook.Sheets[firstSheetName];
         
         // Convert to JSON using array format to easily map standard columns
-        const rawJsonData = xlsx.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: "" });
+        const rawJsonData = xlsx.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: "", raw: false, dateNF: 'dd/mm/yyyy hh:mm' });
         
         // Skip first 10 rows (header/metadata)
         const dataRows = rawJsonData.slice(10);
