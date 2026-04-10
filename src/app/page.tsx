@@ -213,7 +213,7 @@ export default function Home() {
         if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
         else if (col.key === "tienRa" || col.key === "tienVao") {
           const num = cleanNumber(val);
-          if (!isNaN(num)) val = new Intl.NumberFormat('en-US').format(num);
+          if (!isNaN(num)) val = num;
         }
         // Replacing newlines so it doesn't break Excel TSV rows
         return String(val || "").replace(/\n/g, " ");
@@ -245,7 +245,7 @@ export default function Home() {
         if (col.key === "ngayGioGiaoDich") val = formatDateStr(String(val || ""));
         else if (col.key === "tienRa" || col.key === "tienVao") {
            const num = cleanNumber(val);
-           if (!isNaN(num)) val = new Intl.NumberFormat('en-US').format(num);
+           if (!isNaN(num)) val = num;
         }
         return String(val || "").replace(/\n/g, " ");
       }).join("\t");
