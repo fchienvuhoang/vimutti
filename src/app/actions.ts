@@ -78,3 +78,37 @@ export async function saveAppliedCategoriesAction(categories: Category[]) {
     return { success: false, error: "Không thể lưu vào CSDL" };
   }
 }
+
+// -- THEO DÕI SỬ DỤNG LƯỢNG LƯU TRỮ --
+export async function logFileUploadAction(rowCount: number) {
+  // Không cần xác thực cũng có thể ghi log ẩn danh, hoặc cần xác thực
+  if (!(await checkAuthStatus())) return { success: false };
+
+  try {
+    const time = new Date().toISOString();
+    // Ghi log đơn giản vào mảng để theo dõi (Lưu 100 lần gần nhất)
+    await redis.lpush("vimutti_upload_logs", { time, rowCount });
+    await redis.ltrim("vimutti_upload_logs", 0, 99);
+    
+    // Tăng tổng số file đã xử lý
+    await redis.incr("vimutti_total_uploads");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Lỗi khi lưu log upload:", error);
+    return { success: false };
+  }
+}
+
+export async function getUploadStatsAction() {
+  if (!(await checkAuthStatus())) return { total: 0, logs: [] };
+
+  try {
+    const total = await redis.get<number>("vimutti_total_uploads") || 0;
+    const logs = await redis.lrange<{ time: string; rowCount: number }>("vimutti_upload_logs", 0, -1) || [];
+    return { total, logs };
+  } catch (error) {
+    console.error("Lỗi khi lấy log upload:", error);
+    return { total: 0, logs: [] };
+  }
+}

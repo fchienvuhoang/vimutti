@@ -17,9 +17,20 @@ import {
   Check,
   Loader2,
   Save,
-  Sparkles
+  Sparkles,
+  BarChart2,
+  X
 } from "lucide-react";
-import { checkAuthStatus, checkPasswordAction, getCategoriesAction, saveCategoriesAction, saveAppliedCategoriesAction, logoutAction } from "./actions";
+import { 
+  checkAuthStatus, 
+  checkPasswordAction, 
+  getCategoriesAction, 
+  saveCategoriesAction, 
+  saveAppliedCategoriesAction, 
+  logoutAction,
+  logFileUploadAction,
+  getUploadStatsAction
+} from "./actions";
 
 const cleanNumber = (val: any) => {
   if (val === "" || val === null || val === undefined) return NaN;
@@ -120,6 +131,19 @@ export default function Home() {
   const [copiedTab, setCopiedTab] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
 
+  // Stats Modal
+  const [showStats, setShowStats] = useState(false);
+  const [statsData, setStatsData] = useState<{ total: number; logs: { time: string; rowCount: number }[] }>({ total: 0, logs: [] });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  const handleOpenStats = async () => {
+    setShowStats(true);
+    setIsLoadingStats(true);
+    const data = await getUploadStatsAction();
+    setStatsData(data);
+    setIsLoadingStats(false);
+  };
+
   const handleAddOrEditCategory = () => {
     // Split by comma, trim whitespace, and remove empty
     const keywords = newCatKeywords
@@ -195,6 +219,9 @@ export default function Home() {
     try {
       const parsed = await parseExcelBankStatement(file);
       setRecords(parsed);
+      
+      // Ghi log số dòng đã parse để theo dõi mức độ sử dụng (không lưu file)
+      logFileUploadAction(parsed.length).catch(console.error);
     } catch (error) {
       console.error("Error parsing file", error);
       alert("Đã xảy ra lỗi khi đọc file Excel.");
@@ -388,12 +415,21 @@ export default function Home() {
             Bóc tách thông tin thiện pháp dựa trên từ khóa khớp với nội dung giao dịch.
           </p>
         </div>
-        <button 
-          onClick={async () => { await logoutAction(); setIsAuthenticated(false); }}
-          className="text-sm cursor-pointer font-medium text-gray-600 bg-white px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
-        >
-          Đăng xuất
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleOpenStats}
+            className="flex items-center gap-2 text-sm cursor-pointer font-medium text-gray-700 bg-white px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition shadow-sm"
+          >
+            <BarChart2 className="w-4 h-4" />
+            Thống kê
+          </button>
+          <button 
+            onClick={async () => { await logoutAction(); setIsAuthenticated(false); }}
+            className="text-sm cursor-pointer font-medium text-gray-600 bg-white px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition shadow-sm"
+          >
+            Đăng xuất
+          </button>
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto flex flex-col gap-8">
@@ -794,6 +830,57 @@ export default function Home() {
           </section>
         </div>
       </main>
+
+      {/* STATS MODAL */}
+      {showStats && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-indigo-600" />
+                Thống kê sử dụng
+              </h2>
+              <button onClick={() => setShowStats(false)} className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0 cursor-pointer transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 flex-1 overflow-y-auto">
+              {isLoadingStats ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-indigo-50 rounded-xl p-4 flex flex-col items-center justify-center border border-indigo-100 shadow-sm">
+                     <span className="text-sm text-indigo-800 font-medium mb-1">Tổng lượt tải file lên</span>
+                     <span className="text-4xl font-bold text-indigo-600">{statsData.total}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b flex items-center pb-2">
+                       Lịch sử 100 lần gần nhất
+                    </h3>
+                    {statsData.logs.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4 bg-gray-50 rounded-lg">Chưa có dữ liệu tải lên.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {statsData.logs.map((log, idx) => {
+                          const loadDate = new Date(log.time);
+                          return (
+                            <div key={idx} className="flex justify-between items-center text-sm p-3 bg-gray-50 hover:bg-gray-100 transition rounded-lg border border-gray-100">
+                              <span className="text-gray-600 font-medium">{loadDate.toLocaleString('vi-VN')}</span>
+                              <span className="font-semibold text-gray-800 bg-white shadow-sm px-2.5 py-1 rounded-md border border-gray-200">
+                                {log.rowCount} dòng
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
